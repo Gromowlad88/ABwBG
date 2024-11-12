@@ -1,0 +1,240 @@
+---
+title: "Ćw6"
+author: "Artur"
+date: "2024-11-12"
+output: html_document
+---
+##Wczytanie plików FASTQ**
+
+```{R}
+library(ShortRead)
+fq_reads1 <- readFastq("/Users/arturbalicki/Desktop/Studia/Magisterskie/ecoli_simulated1_with_adapters.fq")
+fq_reads2 <- readFastq("/Users/arturbalicki/Desktop/Studia/Magisterskie/ecoli_simulated2_with_adapters.fq")
+```
+
+## Przycinanie odczytów na podstawie jakości**
+
+1. Przytnij bazy o niskiej jakości z końców odczytów:
+
+```{r}
+ # Przycinanie odczytów forward
+   trimmed_reads1 <- trimTailw(fq_reads1, k = 2, a = "B", halfwidth = 1)
+   
+   # Przycinanie odczytów reverse
+   trimmed_reads2 <- trimTailw(fq_reads2, k = 2, a = "B", halfwidth = 1)
+```
+   
+
+2. Sprawdź, ile odczytów zostało przyciętych:
+
+```{r}
+length(fq_reads1)
+length(trimmed_reads1)
+
+length(fq_reads2)
+length(trimmed_reads2)
+
+sum(width(trimmed_reads1) < width(fq_reads1))
+sum(width(trimmed_reads2) < width(fq_reads2))
+```
+
+- Przytnij odczyty i zanotuj, jaki procent odczytów został zmodyfikowany.
+```{r}
+Seq1<-284123/309440*100
+Seq2<-273668/309440*100
+print(Seq1)
+print (Seq2)
+```
+---
+
+##Filtracja odczytów o niskiej jakości**
+
+1. Filtrowanie odczytów (minimalna akceptowalna długość odczytu=50bp:
+
+```{R}
+   # Filtrowanie odczytów forward
+   filtered_reads1 <- trimmed_reads1[width(trimmed_reads1) >= 50]
+   
+   # Filtrowanie odczytów reverse
+   filtered_reads2 <- trimmed_reads2[width(trimmed_reads2) >= 50]
+```
+
+2. Sprawdź liczbę odczytów przed i po filtracji:
+
+```{R}
+   # Odczyty forward
+   length(trimmed_reads1)       # Po przycinaniu
+   length(filtered_reads1)      # Po filtracji
+   
+   # Odczyty reverse
+   length(trimmed_reads2)
+   length(filtered_reads2)
+```
+
+- Oblicz, jaki procent odczytów został odrzucony podczas filtracji.
+```{r}
+Seq1f<-248565/284123*100
+print(Seq1f)
+Seq2f<-223516/273668*100
+print(Seq2f)
+```
+---
+
+##Ponowna kontrola jakości po przycinaniu i filtracji**
+
+
+1. Zapisz przetworzone odczyty do nowych plików FASTQ:
+
+```{R}
+   writeFastq(filtered_reads1, "/Users/arturbalicki/Desktop/Studia/Magisterskie/ecoli_simulated1_processed.fq")
+   writeFastq(filtered_reads2, "/Users/arturbalicki/Desktop/Studia/Magisterskie/ecoli_simulated2_processed.fq")
+```
+
+2. Wygeneruj nowe raporty QC dla przetworzonych danych:
+
+```{R}
+qa_results1 <- qa("/Users/arturbalicki/Desktop/Studia/Magisterskie/ecoli_simulated1_with_adapters.fq", type = "fastq")   
+qa_results1_processed <- qa( "/Users/arturbalicki/Desktop/Studia/Magisterskie/ecoli_simulated1_processed.fq", type = "fastq")
+report(qa_results1, dest = "/Users/arturbalicki/Desktop/Studia/Magisterskie/QA_report_read1")
+report(qa_results1_processed, dest = "/Users/arturbalicki/Desktop/Studia/Magisterskie/QA_report_read1_processed")
+
+qa_results2 <- qa("/Users/arturbalicki/Desktop/Studia/Magisterskie/ecoli_simulated2_with_adapters.fq", type = "fastq")   
+qa_results2_processed <- qa("/Users/arturbalicki/Desktop/Studia/Magisterskie/ecoli_simulated2_processed.fq", type = "fastq")
+report(qa_results2, dest = "/Users/arturbalicki/Desktop/Studia/Magisterskie/QA_report_read2")
+report(qa_results2_processed, dest = "/Users/arturbalicki/Desktop/Studia/Magisterskie/QA_report_read2_processed")
+```
+
+- Opisz zmiany w jakości danych po przycinaniu i filtracji.
+[1] "/Users/arturbalicki/Desktop/Studia/Magisterskie/QA_report_read1/index.html"
+[1] "/Users/arturbalicki/Desktop/Studia/Magisterskie/QA_report_read1_processed/index.html"
+[1] "/Users/arturbalicki/Desktop/Studia/Magisterskie/QA_report_read2/index.html"
+[1] "/Users/arturbalicki/Desktop/Studia/Magisterskie/QA_report_read2_processed/index.html"
+---
+
+## Analiza rozkładu długości odczytów**
+
+1. Porównaj rozkład długości odczytów przed i po przycinaniu:
+
+```{R}
+   # Przed przycinaniem (odczyty forward)
+   hist(width(fq_reads1), breaks = 50, main = "Długość odczytów forward przed przycinaniem", xlab = "Długość (bp)")
+   
+   # Po przycinaniu (odczyty forward)
+   hist(width(filtered_reads1), breaks = 50, main = "Długość odczytów forward po przycinaniu", xlab = "Długość (bp)")
+   
+   # Przed przycinaniem (odczyty reverse)
+   hist(width(fq_reads2), breaks = 50, main = "Długość odczytów reverse przed przycinaniem", xlab = "Długość (bp)")
+   
+   # Po przycinaniu (odczyty forward)
+   hist(width(filtered_reads2), breaks = 50, main = "Długość odczytów reverse po przycinaniu", xlab = "Długość (bp)")
+   
+```
+
+- Porównaj histogramy i opisz, jak przycinanie wpłynęło na długość odczytów.
+
+---
+
+##Wykrywanie i usuwanie sekwencji adapterów**
+
+1. Zdefiniuj sekwencję adaptera (np. dla Illumina) i przytnij adaptery z odczytów:
+
+```{R}
+  library(Biostrings)
+   adapter_seq <- DNAString("AGATCGGAAGAGC")
+# Przycinanie adapterów z odczytów forward:
+trimmed_reads1_adapt <- trimLRPatterns(
+  Lpattern = adapter_seq,
+  subject = filtered_reads1
+)
+
+# Defuniujemy odczyty po przycięciu adapterów:
+filtered_reads1 <- trimmed_reads1_adapt
+
+# Przycinanie adapterów z odczytów reverse:
+trimmed_reads2_adapt <- trimLRPatterns(
+  Lpattern = adapter_seq,
+  subject = filtered_reads2
+)
+
+# Defuniujemy odczyty po przycięciu adapterów:
+filtered_reads2 <- trimmed_reads2_adapt
+
+```
+
+2. Sprawdź efekty przycinania:
+
+```{R}
+# Porównaj długości przed i po przycięciu adapterów
+length(filtered_reads1)
+length(trimmed_reads1)
+
+length(filtered_reads2)
+length(trimmed_reads2)
+
+# Sprawdź ile odczytów zostało zmodyfikowanych
+   sum(width(filtered_reads1) < width(trimmed_reads1))
+   sum(width(filtered_reads2) < width(trimmed_reads2))
+```
+
+
+- Przytnij odczyty zawierające adaptery i sprawdź, ile odczytów zostało zmodyfikowanych.
+```{r}
+Seq1mod<-284123-248565
+print(Seq1mod)
+Seq2mod<-273668-223516
+print (Seq2mod)
+```
+---
+
+##Ponowna kontrola jakości po usunięciu adapterów**
+
+1. Zapisz odczyty po usunięciu adapterów:
+
+```{R}
+   writeFastq(filtered_reads1, "/Users/arturbalicki/Desktop/Studia/Magisterskie/ecoli_simulated1_final.fq")
+   writeFastq(filtered_reads2, "/Users/arturbalicki/Desktop/Studia/Magisterskie/ecoli_simulated2_final.fq")
+```
+
+2. Wygeneruj ostateczne raporty QC:
+
+```{R}
+   qa_results1_final <- qa("/Users/arturbalicki/Desktop/Studia/Magisterskie/ecoli_simulated1_final.fq", type = "fastq")
+   report(qa_results1_final, dest = "/Users/arturbalicki/Desktop/Studia/Magisterskie/QA_report_read1_final")
+   
+   qa_results2_final <- qa("/Users/arturbalicki/Desktop/Studia/Magisterskie/ecoli_simulated2_final.fq", type = "fastq")
+   report(qa_results2_final, dest = "/Users/arturbalicki/Desktop/Studia/Magisterskie/QA_report_read2_final")
+```
+
+3. Porównaj raporty QC przed i po usunięciu adapterów.
+
+
+- Opisz zmiany w jakości danych po usunięciu adapterów.
+"/Users/arturbalicki/Desktop/Studia/Magisterskie/QA_report_read1_final/index.html"
+[1] "/Users/arturbalicki/Desktop/Studia/Magisterskie/QA_report_read2_final/index.html"
+---
+
+##Dokumentacja i raportowanie wyników**
+
+1. Uzupełnij dokument R Markdown (`QC_and_Trimming_Report.Rmd`) o:
+
+   - Kody R użyte w przycinaniu i filtracji.
+   - Wyniki w postaci wykresów i tabel.
+   - Interpretację wyników i wnioski.
+
+2. Wygeneruj raport w formacie HTML lub PDF.
+
+**Zadanie do wykonania:**
+
+- Przygotuj przejrzysty i kompletny raport z procesu przycinania i filtracji.
+
+---
+
+## **Podsumowanie**
+
+Przeprowadziliśmy pełny proces kontroli jakości oraz przycinania i filtracji danych NGS z wykorzystaniem symulowanych odczytów **Escherichia coli**. Dzięki temu przećwiczyliśmy w praktyce:
+
+- Wczytywanie i podstawową analizę danych sekwencyjnych w R.
+- Generowanie i interpretację raportów QC.
+- Przycinanie odczytów na podstawie jakości i usuwanie sekwencji adapterów.
+- Dokumentację i raportowanie wyników analiz bioinformatycznych.
+
