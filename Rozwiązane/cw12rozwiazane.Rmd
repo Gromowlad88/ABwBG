@@ -1,0 +1,98 @@
+---
+title: "cw12rozwiazane"
+author: "Artur"
+date: "2025-01-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+INSTALACJA PAKIETÓW
+```{r}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+BiocManager::install(c("VariantAnnotation", "GenomicRanges", "AnnotationHub"))
+# Ładowanie pakietów
+library(VariantAnnotation)
+library(GenomicRanges)
+library(AnnotationHub)
+```
+Wczytanie i eksploracja danych
+```{r}
+# Wczytanie pliku VCF z podanej ścieżki
+vcf_file <- "/Users/arturbalicki/Desktop/Uzupelnione/sample.vcf"
+vcf <- readVcf(vcf_file, "hg19")
+
+# Wyświetlenie podstawowych informacji o pliku
+vcf
+header(vcf)
+info(vcf)
+geno(vcf)
+
+# Liczba wariantów
+num_variants <- length(rowRanges(vcf))
+cat("Liczba wariantów:", num_variants, "\n")
+```
+Filtracja i analiza jakości
+```{r}
+# Sprawdzenie kolumny QUAL
+qual_values <- qual(vcf)
+summary(qual_values)
+
+# Obsługa NAs w kolumnie QUAL - odfiltrowanie wierszy z brakującymi wartościami
+vcf_filtered <- vcf[!is.na(qual_values) & qual_values >= 20]
+
+# Liczba wariantów po filtracji
+cat("Liczba wariantów po filtracji:", length(rowRanges(vcf_filtered)), "\n")
+```
+Anotacja wariantów
+```{r}
+# Ładowanie TxDb do anotacji
+BiocManager::install("TxDb.Hsapiens.UCSC.hg19.knownGene", ask = FALSE)
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+
+txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
+annotation <- locateVariants(vcf_filtered, txdb, CodingVariants())
+
+# Wyświetlenie podsumowania anotacji
+table(annotation$LOCATION)
+```
+Przykłady dalszej analizy
+```{r}
+# Załaduj wymagane pakiety
+library(VariantAnnotation)
+library(GenomicRanges)
+library(AnnotationHub)
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+
+# Wczytaj TxDb dla genomu hg19
+txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
+
+# Warianty z regionów UTR
+utr_variants <- locateVariants(vcf_filtered, txdb, AllVariants())
+
+# Filtracja wariantów z regionów 5'UTR i 3'UTR
+utr_5 <- utr_variants[utr_variants$LOCATION == "fiveUTR"]
+utr_3 <- utr_variants[utr_variants$LOCATION == "threeUTR"]
+
+# Liczba wariantów w regionach 5'UTR i 3'UTR
+cat("Liczba wariantów w 5'UTR:", length(utr_5), "\n")
+cat("Liczba wariantów w 3'UTR:", length(utr_3), "\n")
+
+# Warianty międzygenowe
+intergenic_variants <- locateVariants(vcf_filtered, txdb, IntergenicVariants())
+
+# Liczba wariantów międzygenowych
+cat("Liczba wariantów międzygenowych:", length(intergenic_variants), "\n")
+```
+Podsumowanie
+```{r}
+cat("Podsumowanie:\n")
+cat("Liczba wariantów przed filtracją:", num_variants, "\n")
+cat("Liczba wariantów po filtracji:", length(rowRanges(vcf_filtered)), "\n")
+cat("Liczba wariantów w 5'UTR:", length(utr_5), "\n")
+cat("Liczba wariantów w 3'UTR:", length(utr_3), "\n")
+cat("Liczba wariantów międzygenowych:", length(intergenic_variants), "\n")
+```
